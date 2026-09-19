@@ -69,4 +69,54 @@ src/
 - Mounted the user router in `app.js` under the `/api/v1/users` base path
 - Wrapped the `registerUser` controller with **asyncHandler** for asynchronous error handling
 
+## Commit 8 - User Registration Logic
 
+- Added complete **user registration logic** in `registerUser`
+- Extracted and validated required user details from `req.body`
+
+  ```
+  if (
+      [username, email, fullname, password].some((field) => field?.trim() === "")
+    ) {
+      throw new ApiError(400, "All fields are required");
+    }
+  ```
+- Checked for **existing users** using username or email
+  ```
+    const existedUser = User.findOne({
+      $or: [{ username }, { email }],
+    });
+  ```
+- Used **Multer Middleware** to receive avatar and cover image uploads inside `user.routes.js`
+  ```
+  router.route("/register").post(
+    upload.fields([
+      {
+        name: "avatar",
+        maxCount: 1,
+      },
+      {
+        name: "coverImage",
+        maxCount: 1,
+      },
+    ]),
+    registerUser
+  );
+  ```
+- Get LocalFilePath of images via  
+  ```
+    const avatarLocalPath = req.files?.avatar[0]?.path;
+  ```
+- Uploaded user images from LocalFilePath to **Cloudinary** and obtained their URLs
+  ```
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+  ```
+- Created the user document in **MongoDB** with the uploaded image URLs
+- Fetched the newly created user while excluding **password and refreshToken** from the response
+  ```
+  const createdUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    );
+
+  ```
+- Returned a standardized **ApiResponse** with `201 Created` on successful registration
