@@ -168,3 +168,94 @@ src/
 
   ```
 - Returned a standardized **ApiResponse** with `201 Created` on successful registration
+
+## 9 - User Login, Logout & JWT Authentication
+
+- Added **`loginUser`** and **`logoutUser`** controllers in `user.controller.js`
+- Checked if user exits using **`User.findOne()`** and verified the password using the existing 
+  ```
+  **`isPasswordCorrect()`** method
+    const user = await User.findOne({
+      $or: [{ username }, { email }],
+    });
+  ```
+  ```
+    const isPasswordValid = await user.isPasswordCorrect(password);
+  ```
+
+- Added **`generateAccessAndRefreshTokens`** utility inside `user.controller.js` to generate and store both tokens
+  ```
+  const user = await User.findById(userId);
+      const accessToken = await user.generateAccessToken();
+      const refreshToken = await user.generateRefreshToken();
+
+      user.refreshToken = refreshToken;
+      await user.save({ validateBeforeSave: false });
+
+      return { accessToken, refreshToken }; 
+  ```
+
+- Fetched the logged-in user while excluding **`password`** and **`refreshToken`**
+- Stored **accessToken** and **refreshToken** in **HTTP-only cookies**
+  ```
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+  ```
+
+- Added **`verifyJWT` authentication middleware** in `middlewares/auth.middleware.js`
+- Middleware extracts the JWT from **cookies** or the **Authorization header**
+  ```
+  const token =
+    req.cookies?.accessToken ||
+    req.header("Authorization")?.replace("Bearer ", "");
+  ```
+
+- Verifies the token using **`jwt.verify()`** and fetches the logged-in user from MongoDB using the `decodedToken?._id`
+
+  ```
+  const decodedToken = jwt.verify(
+    token,
+    process.env.ACCESS_TOKEN_SECRET
+  );
+
+  const user = await User.findById(decodedToken?._id).select(
+    "-password -refreshToken"
+  );
+  ```
+- Sets loggedInUser - user details in **request object** so protected controllers can access the logged-in user using `req.user`  
+  ```
+    req.user = user
+  ```
+
+- Added **`logoutUser`** controller to remove the stored refresh token from MongoDB and clear authentication cookies
+
+  ```
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    { new: true }
+  );
+  ```
+  ```
+   return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out successfully"));
+  ```
+
+- Added corresponding **login and logout routes** in `user.routes.js`
+- Authentication flow:
+
+  `Login Request → Validate User → Verify Password → Generate JWTs → Store Tokens in Cookies → verifyJWT → Fetch User → req.user → Logout`
