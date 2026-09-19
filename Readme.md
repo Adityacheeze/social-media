@@ -1,6 +1,6 @@
 # Project Journey
 
-## Commit 1 — Project Setup
+##  1 - Project Setup
 
 - Set up the Node.js project
 - Added **Nodemon** as a development dependency to automatically restart the server whenever code changes during development.
@@ -25,21 +25,21 @@ src/
 .env               → Stores environment variables
 ```
 
-## Commit 2 - Prettier Setup 
+##  2 - Prettier Setup 
 - Added **Prettier** as a dev dependency
 - Added .prettierrc and .prettierignore 
 
-## Commit 3 - Mongo Atlas Connection 
+##  3 - Mongo Atlas Connection 
 - Added **dotenv, mongoose, express** dependencies
 - DB connection logic inside a method `connectDB` in a sepearte file on `/db/index.js` 
  
 
-## Commit 4 - Backend Utilities
+##  4 - Backend Utilities
 - Added **cookie-parser, cors** dependencies
 - Added **ApiError** class for standardized API error handling
 - Added **ApiResponse** class for standardized API success responses
 - Added **asyncHandler** wrapper to handle errors from asynchronous route handlers
-- Configured **Express** middleware for request parsing - [JSON, URL-encoded data, static files], CORS and cookies
+- Configured **Express** middleware `app.js` for request parsing - [JSON, URL-encoded data, static files], CORS and cookies
   - `cors()` → Enables cross-origin requests with credentials support
   - `express.json()` → Parses incoming JSON request bodies (16KB limit)
   - `express.urlencoded()` → Parses URL-encoded form data (16KB limit)
@@ -47,29 +47,77 @@ src/
   - `cookieParser()` → Parses cookies from incoming requests
 
 
-## Commit 5 - Video Model and User Model
+##  5 - Video Model and User Model
 - Added **bcrypt, jsonwebtoken, mongoose-paginate-v2** dependencies
-- Added **User** schema with authentication fields, profile information and video watch history
-- Added **Video** schema with video metadata, owner reference and publishing status
-- Added **password hashing** using bcrypt before saving users 
-- Added methods for **password verification** and **JWT access and refresh token generation**
-- Added **aggregate pagination** support for the Video model
+- Added **User** schema with authentication fields, profile information and video watch history in `user.models.js`
+- Added **Video** schema with video metadata, owner reference and publishing status in `video.models.js`
+- Added **password hashing** using bcrypt before saving users using the `userSchema.pre` method
+- Added methods for **password verification** and **JWT access and refresh token generation** - `isPasswordCorrect`, `generateAccessToken`, `generateRefreshToken`
+- Added **aggregate pagination** support for the Video model 
+  ```
+  videoSchema.plugin(mongooseAgregatePaginate);
+  ```
 
-## Commit 6 - Added Cloudinary Utility and Multer Middleware
+##  6 - Added Cloudinary Utility and Multer Middleware
 
 - Added **cloudinary** and **multer** dependencies
 - Configured Multer to temporarily store uploaded files inside `public/temp`
+  ```
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, "./public/temp/");
+    },
+    filename: function (req, file, cb) {
+      cb(null, file.originalname);
+    },
+  });
+
+  export const upload = multer({ storage });
+  ```
 - Added Cloudinary utility to upload temporary local files to Cloudinary and obtain their cloud URL
-- Added **temporary file cleanup** if Cloudinary upload fails
+
+  ```
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
+  const uploadOnCloudinary = async (localFilePath) => {
+    try {
+      if (!localFilePath) return null;
+
+      // upload file to cloudinary
+      const response = await cloudinary.uploader.upload(localFilePath, {
+        resource_type: "auto",
+      });
+
+      console.log("Cloudinary file upload successfull; URL: ", response.url);
+      // file uploaded successfully
+
+      fs.unlinkSync(localFilePath); // delete the local file if upload fails
+      return response;
+    }
+  };
+
+  export { uploadOnCloudinary };
+  ```
 - Client → Multer → Temporary local file → Cloudinary → Cloud URL
 
-## Commit 7 - Register Route Setup
+##  7 - Register Route Setup
 - Added **user controller** with an initial dummy `registerUser` controller
 - Added **user routes** and configured the register endpoint as `POST /register`
 - Mounted the user router in `app.js` under the `/api/v1/users` base path
+
+  ```
+  import userRouter from "./routes/user.routes.js";
+
+  // Routes Declaration
+  app.use("/api/v1/users", userRouter);
+  ```
 - Wrapped the `registerUser` controller with **asyncHandler** for asynchronous error handling
 
-## Commit 8 - User Registration Logic
+##  8 - User Registration Logic
 
 - Added complete **user registration logic** in `registerUser`
 - Extracted and validated required user details from `req.body`
